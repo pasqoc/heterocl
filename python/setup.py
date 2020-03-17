@@ -36,12 +36,12 @@ setup(
   version = "0.1",
   packages = find_packages(),
   install_requires=[
-      'numpy==1.16.1',
+      'numpy>=1.16.1',
       'decorator',
-      'networkx==2.2',
-      'matplotlib==2.2.3',
-      'backports.functools_lru_cache==1.2.1',
-      'ordered_set'
+      'networkx>=2.2',
+      'matplotlib>=2.2.3',
+      'backports.functools_lru_cache>=1.2.1',
+      'ordered-set'
       ],
   **setup_kwargs)
 
