@@ -11,7 +11,7 @@ users to define a hardware module.
 import heterocl as hcl
 import numpy as np
 
-##############################################################################
+#%%###########################################################################
 # Defining a Hardware Module
 # --------------------------
 # It is important for users to define a hardware module. The main reason is
@@ -51,7 +51,7 @@ def maximum(A, B, C, D):
     max_2 = hcl.compute(A.shape, lambda x: find_max(C, D, x), "max_2")
     return hcl.compute(A.shape, lambda x: find_max(max_1, max_2, x), "max_o")
 
-##############################################################################
+#%%###########################################################################
 # We can first inspect the generated IR. You can see that for each computation,
 # we reuse the same module to find the maximum.
 
@@ -63,7 +63,7 @@ D = hcl.placeholder((10,), "D")
 s = hcl.create_schedule([A, B, C, D], maximum)
 print(hcl.lower(s))
 
-##############################################################################
+#%%###########################################################################
 # Finally, let's run the algorithm and check the results
 
 f = hcl.build(s)
@@ -96,7 +96,7 @@ m2 = np.maximum(c, d)
 m = np.maximum(m1, m2)
 assert np.array_equal(hcl_O.asnumpy(), m)
 
-##############################################################################
+#%%###########################################################################
 # Modules Without Return Statement
 # --------------------------------
 # HeteroCL also allows users to define modules without a return statement. The
@@ -123,7 +123,7 @@ def maximum2(A, B, C, D):
 s = hcl.create_schedule([A, B, C, D], maximum2)
 f = hcl.build(s)
 
-##############################################################################
+#%%###########################################################################
 # In the above example, we can see that now without the return value, we can
 # directly call the defined module. Let's check the results. They should be
 # the same as our first example.
@@ -139,7 +139,7 @@ m2 = np.maximum(c, d)
 m = np.maximum(m1, m2)
 assert np.array_equal(hcl_D.asnumpy(), m)
 
-##############################################################################
+#%%###########################################################################
 # Data Type Customization for Modules
 # -----------------------------------
 # We can also apply data type customization to our defined modules. There are
@@ -160,7 +160,7 @@ s.downsize([maximum.max_1, maximum.max_2], hcl.UInt(4))
 s = hcl.create_schedule_from_scheme(s)
 f = hcl.build(s)
 
-##############################################################################
+#%%###########################################################################
 # Let's run it.
 
 hcl_A = hcl.asarray(a, hcl.UInt(4))
@@ -174,7 +174,7 @@ f(hcl_A, hcl_B, hcl_C, hcl_D, hcl_O)
 print("Downsized output tensor:")
 print(hcl_O)
 
-##############################################################################
+#%%###########################################################################
 # We can see that the results are downsized to 4-bit numbers. We can double
 # check this.
 

@@ -22,7 +22,7 @@ s.downsize(kernel.B, hcl.UInt(4))
 s = hcl.create_schedule_from_scheme(s)
 s.partition(A)
 s[kernel.B].pipeline(kernel.B.axis[1])
-##############################################################################
+#%%###########################################################################
 # CPU
 # ---
 # CPU is the default back end of a HeteroCL program. If you want to be more
@@ -31,13 +31,13 @@ s[kernel.B].pipeline(kernel.B.axis[1])
 # ``pipeline`` have no effect. Instead, we can use ``parallel``.
 f = hcl.build(s) # equivalent to hcl.build(s, target="llvm")
 
-##############################################################################
+#%%###########################################################################
 # We can execute the returned function as we demonstrated in other tutorials.
 hcl_A = hcl.asarray(np.random.randint(0, 10, A.shape))
 hcl_B = hcl.asarray(np.zeros((8, 8)), dtype=hcl.UInt(4))
 f(hcl_A, hcl_B)
 
-##############################################################################
+#%%###########################################################################
 # FPGA
 # ----
 # For FPGA, we provide several back ends.
@@ -49,7 +49,7 @@ f(hcl_A, hcl_B)
 f = hcl.build(s, target="vhls")
 print(f)
 
-##############################################################################
+#%%###########################################################################
 # Vivado HLS C++ Code Simulation
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # HeteroCL provides users with the ability to simulation the generated HLS
@@ -76,7 +76,7 @@ if "Vivado_HLS" in str(stderr):
     f = hcl.build(s, target="vhls_csim")
     f(hcl_A, hcl_B)
 
-##############################################################################
+#%%###########################################################################
 # Intel HLS C++ Code Generation
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # HeteroCL can also generate Intel HLS code. However, due to certain
@@ -85,7 +85,7 @@ if "Vivado_HLS" in str(stderr):
 f = hcl.build(s, target="ihls")
 print(f)
 
-##############################################################################
+#%%###########################################################################
 # Merlin C Code Generation
 # ~~~~~~~~~~~~~~~~~~~~~~~~
 # HeteroCL can generate C code that can be used along with
@@ -98,7 +98,7 @@ print(f)
 f = hcl.build(s, target="merlinc")
 print(f)
 
-##############################################################################
+#%%###########################################################################
 # SODA Stencil Code Generation
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # HeteroCL incorporates the SODA framework for efficient stencil architecture

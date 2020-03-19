@@ -24,3 +24,5 @@ out
 *.params
 *.gz
 
+activate
+.vscode
