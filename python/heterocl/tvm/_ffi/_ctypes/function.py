@@ -141,6 +141,9 @@ def _make_tvm_args(args, temp_args):
             values[i].v_handle = arg.handle
             type_codes[i] = TypeCode.FUNC_HANDLE
             temp_args.append(arg)
+        elif 'tvm.ndarray.NDArray' in str(type(arg)):
+            values[i].v_handle = ctypes.cast(arg.handle, ctypes.c_void_p)
+            type_codes[i] = TypeCode.ARRAY_HANDLE
         else:
             raise TypeError("Don't know how to handle type %s" % type(arg))
     return values, type_codes, num_args
