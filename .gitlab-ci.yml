@@ -40,6 +40,7 @@ build-heterocl:
     untracked: true
   script:
     - *work_venv
+    - sed -i 's/--user//g' Makefile;
     - make -j4
 
 test-heterocl:
