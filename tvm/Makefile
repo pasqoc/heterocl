@@ -41,6 +41,7 @@ ifdef LLVM_CONFIG
 	LLVM_VERSION=$(shell $(LLVM_CONFIG) --version| cut -b 1,3)
 	LLVM_INCLUDE=$(filter -I%, $(shell $(LLVM_CONFIG) --cxxflags))
 	LDFLAGS += $(shell $(LLVM_CONFIG) --ldflags --libs --system-libs)
+	LDFLAGS += -Wl,-rpath $(shell $(LLVM_CONFIG) --libdir)
 	LLVM_CFLAGS += $(LLVM_INCLUDE) -DTVM_LLVM_VERSION=$(LLVM_VERSION)
 else
 	LLVM_VERSION=00

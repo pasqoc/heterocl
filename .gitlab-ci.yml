@@ -47,7 +47,8 @@ test-heterocl:
   tags: *shell_runners
   script:
     - *work_venv
-    - python -m pytest tests
+    - cd tests; pytest --forked -v -k codegen
+#    - python -m pytest tests
 #    - python -m pytest samples
 #    - python -m pytest tutorials
 #    - python -m pytest hlib/tests
