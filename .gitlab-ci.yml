@@ -25,12 +25,9 @@ stages:
   - build
   - test
 
-variables:
-  - RUNNER: "shell"
-
 # Define a list of available shell runners.
 .shell_runners: &shell_runners
-  - $RUNNER
+  - shell
 
 # Define common setup script tasks.
 .work_venv: &work_venv
