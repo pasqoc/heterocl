@@ -7,20 +7,19 @@ all: build-hcl
 build-pkgs:
 	$(MAKE) -C pkgs
 
-#build-tvm: build-pkgs
 build-tvm:
 	$(MAKE) -C tvm
 
 build-hcl: build-tvm
 	cd python; \
 	python setup.py install; \
-  cd ../hlib/python; \
+	cd ../hlib/python; \
 	python setup.py install;
 
 build-python:
 	cd python; \
 	python setup.py install; \
-  cd ../hlib/python; \
+	cd ../hlib/python; \
 	python setup.py install;
 
 clean:
