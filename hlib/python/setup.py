@@ -42,6 +42,7 @@ setup(
       'matplotlib',
       'backports.functools-lru-cache',
       'ordered_set'
+      'ordered_set'
       ],
   **setup_kwargs)
 
