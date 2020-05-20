@@ -7,7 +7,8 @@ all: build-hcl
 build-pkgs:
 	$(MAKE) -C pkgs
 
-build-tvm: build-pkgs
+#build-tvm: build-pkgs
+build-tvm:
 	$(MAKE) -C tvm
 
 build-hcl: build-tvm
