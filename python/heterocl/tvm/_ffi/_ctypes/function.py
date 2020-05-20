@@ -92,7 +92,7 @@ def _make_tvm_args(args, temp_args):
         elif arg is None:
             values[i].v_handle = None
             type_codes[i] = TypeCode.NULL
-        elif isinstance(arg, NDArrayBase):
+        elif isinstance(arg, NDArrayBase) or '.ndarray.NDArray' in str(type(arg)):
             values[i].v_handle = ctypes.cast(arg.handle, ctypes.c_void_p)
             type_codes[i] = TypeCode.ARRAY_HANDLE
         elif isinstance(arg, _nd._TVM_COMPATS):
