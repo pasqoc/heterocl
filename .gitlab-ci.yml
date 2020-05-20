@@ -25,9 +25,12 @@ stages:
   - build
   - test
 
+variables:
+  - RUNNER: "shell"
+
 # Define a list of available shell runners.
 .shell_runners: &shell_runners
-  - zhenkuny-v01-shell-runner
+  - $RUNNER
 
 # Define common setup script tasks.
 .work_venv: &work_venv
@@ -40,7 +43,6 @@ build-heterocl:
     untracked: true
   script:
     - *work_venv
-    - sed -i 's/--user//g' Makefile;
     - make -j4
 
 test-heterocl:
