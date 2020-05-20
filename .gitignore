@@ -22,5 +22,6 @@ out
 *.params
 *.gz
 
-# Generated files
+activate
+.vscode
 project

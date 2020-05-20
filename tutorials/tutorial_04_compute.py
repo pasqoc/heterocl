@@ -12,7 +12,7 @@ introduce several compute customization primitives.
 
 import heterocl as hcl
 
-##############################################################################
+#%%###########################################################################
 # Hardware Customization
 # ----------------------
 # Hardware customization is important in hardware applications. HeteroCL
@@ -37,7 +37,7 @@ def two_stage(A):
 s = hcl.create_schedule([A], two_stage)
 s_B = two_stage.B
 
-##############################################################################
+#%%###########################################################################
 # Note that we can get the stage by accessing the properties of the function
 # that defines the algorithm `two_stage`. To access the stage in this way, you
 # **need to name the stages**.
@@ -46,7 +46,7 @@ s_B = two_stage.B
 
 print(hcl.lower(s))
 
-##############################################################################
+#%%###########################################################################
 # We can take a look at the dataflow graph to visualize the relation between
 # stages.
 try:
@@ -54,7 +54,7 @@ try:
 except:
     pass
 
-##############################################################################
+#%%###########################################################################
 # Loop Transformation
 # -------------------
 # Applying loop transformations to our application can potentially increase
@@ -68,7 +68,7 @@ except:
 
 s[s_B].reorder(s_B.axis[1], s_B.axis[0])
 
-##############################################################################
+#%%###########################################################################
 # To apply a compute customization primitive, we need to use the schedule
 # we created. We can also access the axis of a stage by its index. In this
 # example, `s_B.axis[0]` refers to axis `x`. Similarly, `s_B.axis[1]` refers
@@ -76,7 +76,7 @@ s[s_B].reorder(s_B.axis[1], s_B.axis[0])
 
 print(hcl.lower(s))
 
-##############################################################################
+#%%###########################################################################
 # We can see that axis `x` and axis `y` are indeed reordered.
 #
 # ``split``
@@ -88,7 +88,7 @@ s = hcl.create_schedule([A], two_stage)
 s_B = two_stage.B
 x_out, x_in = s[s_B].split(s_B.axis[0], 5)
 
-##############################################################################
+#%%###########################################################################
 # Here we recreate a new schedule so that we will not confuse it with the
 # previous schedule. We can see that, with the ``hcl.split`` primitive, we get
 # two new axes `x_out` and `x_in`. To make it clear, let's take a look at the
@@ -96,7 +96,7 @@ x_out, x_in = s[s_B].split(s_B.axis[0], 5)
 
 print(hcl.lower(s))
 
-##############################################################################
+#%%###########################################################################
 # The returned variable `x_out` corresponds to the axis `x.outer` in the IR.
 # Since we split the axis with a factor 5, now the outer loop only iterates
 # two times with the inner loop iterating from 0 to 5. We can further combine
@@ -106,7 +106,7 @@ s[s_B].reorder(s_B.axis[1], x_out, x_in)
 
 print(hcl.lower(s))
 
-##############################################################################
+#%%###########################################################################
 # In the generated IR, we can see that the three axes are reordered according
 # to what we specified.
 #
@@ -121,7 +121,7 @@ x_y = s[s_B].fuse(s_B.axis[0], s_B.axis[1])
 
 print(hcl.lower(s))
 
-##############################################################################
+#%%###########################################################################
 # Similar to the previous example, we recreate a new schedule. Here we fuse
 # the two axes `x` and `y` into a single axis `x_y`, which corresponds to
 # `x.y.fused` in the generated IR. Now the loop iterates from 0 to 1000, as
@@ -140,7 +140,7 @@ s_B = two_stage.B
 s_C = two_stage.C
 s[s_B].compute_at(s[s_C], s_C.axis[0])
 
-##############################################################################
+#%%###########################################################################
 # In this example, we specify stage B to be computed within stage C at the
 # first axis `x`. Originally, we first completely compute stage B and then
 # stage C. However, in this scenario, after we finish the computation of
@@ -150,7 +150,7 @@ s[s_B].compute_at(s[s_C], s_C.axis[0])
 
 print(hcl.lower(s))
 
-##############################################################################
+#%%###########################################################################
 # We can observe from the IR that now both stages share the same outer loop
 # `x`. Moreover, we only need to allocate the memory for partial results.
 #
@@ -169,7 +169,6 @@ print(hcl.lower(s))
 s = hcl.create_schedule([A], two_stage)
 s_B = two_stage.B
 s_C = two_stage.C
-
 s[s_B].reorder(s_B.axis[1], s_B.axis[0])
 s[s_C].reorder(s_C.axis[1], s_C.axis[0])
 s[s_B].compute_at(s[s_C], s_C.axis[0])
@@ -178,7 +177,7 @@ s[s_C].pipeline(s_C.axis[0])
 
 print(hcl.lower(s))
 
-##############################################################################
+#%%###########################################################################
 # Apply to Imperative DSL
 # -----------------------
 # HeteroCL also lets users to apply these primitives to imperative DSLs. In
@@ -200,7 +199,7 @@ i_out, i_in = s[s_S].split(s_S.i, 2)
 
 print(hcl.lower(s))
 
-##############################################################################
+#%%###########################################################################
 # We can also access the imperative axes with their showing up order.
 
 assert(s_S.i == s_S.axis[0])

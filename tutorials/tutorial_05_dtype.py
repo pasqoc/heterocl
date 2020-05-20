@@ -11,7 +11,7 @@ HeteroCL.
 
 import heterocl as hcl
 
-##############################################################################
+#%%###########################################################################
 # Data Types Supported by HeteroCL
 # --------------------------------
 # HeteroCL supports both bit-accurate data types and floating points. We show
@@ -25,12 +25,12 @@ hcl.UFixed(44, 30) # 44-bit unsigned fixed point with 30 fractional bits
 hcl.Float(32) # single-precision floating point
 hcl.Float(64) # double-precision floating point
 
-##############################################################################
+#%%###########################################################################
 # These data types can be used in ``hcl.init`` to set the default data type
 
 hcl.init(hcl.Float())
 
-##############################################################################
+#%%###########################################################################
 # Data Type Customization
 # -----------------------
 # Another important hardware customization is data type customization, which
@@ -43,7 +43,7 @@ A = hcl.placeholder((10,))
 def quantization(A):
     return hcl.compute(A.shape, lambda x: hcl.tanh(A[x]), "B")
 
-##############################################################################
+#%%###########################################################################
 # First, let's build the application without applying any quantization scheme.
 
 s = hcl.create_schedule([A], quantization)
@@ -64,14 +64,14 @@ print(np_A)
 print('After tanh')
 print(np_B)
 
-##############################################################################
+#%%###########################################################################
 # Now let's use ``hcl.create_scheme`` to create a quantization scheme. The
 # usage is the same as ``hcl.create_schedule``.
 
 sm = hcl.create_scheme([A], quantization)
 sm_B = quantization.B
 
-##############################################################################
+#%%###########################################################################
 # After we create the schemes, we have two methods that can be used. First,
 # if we are dealing with **integers**, we need to use ``downsize``. Second,
 # if we are dealing with **floating points**, we need to use ``quantize``.
@@ -81,7 +81,7 @@ sm_B = quantization.B
 
 sm.quantize(sm_B, hcl.Fixed(10, 8))
 
-##############################################################################
+#%%###########################################################################
 # In this example, since we know the output of `tanh` is between 1 and -1,
 # we can safely set the integer part to be 2 bits (i.e., 10-8). The larger
 # total bitwidth we choose, the more accurate we get. Now we can create the
@@ -102,7 +102,7 @@ print(np_B)
 print('Quantized to Fixed(10, 8)')
 print(np_BQ)
 
-##############################################################################
+#%%###########################################################################
 # We can double-check this.
 
 assert np.array_equal(np_BQ, np.trunc(np_B*256)/256)

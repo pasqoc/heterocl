@@ -13,7 +13,7 @@ We usually use ``hcl`` as the acronym of HeteroCL.
 
 import heterocl as hcl
 
-##############################################################################
+#%%###########################################################################
 # Initialize the Environment
 # --------------------------
 # We need to initialize the environment for each HeteroCL application. We can
@@ -28,7 +28,7 @@ import heterocl as hcl
 
 hcl.init()
 
-##############################################################################
+#%%###########################################################################
 # Algorithm Definition
 # --------------------
 # After we initialize, we define the algorithm by using a Python function
@@ -59,7 +59,7 @@ def simple_compute(a, A):
 
     return B
 
-##############################################################################
+#%%###########################################################################
 # Inputs/Outputs Definition
 # -------------------------
 # One of the advantages of such *modularized algorithm definition* is that we
@@ -79,7 +79,7 @@ def simple_compute(a, A):
 a = hcl.placeholder((), "a")
 A = hcl.placeholder((10, 10), "A")
 
-##############################################################################
+#%%###########################################################################
 # Apply Hardware Customization
 # ----------------------------
 # Usually, our next step is apply various hardware customization techniques to
@@ -90,7 +90,7 @@ A = hcl.placeholder((10, 10), "A")
 
 s = hcl.create_schedule([a, A], simple_compute)
 
-##############################################################################
+#%%###########################################################################
 # Inspect the Intermediate Representation (IR)
 # --------------------------------------------
 # A HeteroCL program will be lowered to an IR before backend code generation.
@@ -99,7 +99,7 @@ s = hcl.create_schedule([a, A], simple_compute)
 
 print(hcl.lower(s))
 
-##############################################################################
+#%%###########################################################################
 # Create the Executable
 # ---------------------
 # The next step is to build the executable by using ``hcl.build``. You can
@@ -109,7 +109,7 @@ print(hcl.lower(s))
 
 f = hcl.build(s)
 
-##############################################################################
+#%%###########################################################################
 # Prepare the Inputs/Outputs for the Executable
 # ---------------------------------------------
 # To run the generated executable, we can feed it with Numpy arrays by using
@@ -118,7 +118,7 @@ f = hcl.build(s)
 # randomly generate the values for our input tensor `A`. Note that since we
 # return a new tensor at the end of our algorithm, we also need to prepare
 # an input array for tensor `B`.
-
+#%%
 import numpy as np
 
 hcl_a = 10
@@ -126,14 +126,14 @@ np_A = np.random.randint(100, size = A.shape)
 hcl_A = hcl.asarray(np_A)
 hcl_B = hcl.asarray(np.zeros(A.shape))
 
-##############################################################################
+#%%###########################################################################
 # Run the Executable
 # ------------------
 # With the prepared inputs/outputs, we can finally feed them to our executable.
 
 f(hcl_a, hcl_A, hcl_B)
 
-##############################################################################
+#%%###########################################################################
 # View the Results
 # ----------------
 # To view the results, we can transform the HeteroCL tensors back to Numpy
@@ -146,7 +146,7 @@ print(hcl_a)
 print(np_A)
 print(np_B)
 
-##############################################################################
+#%%###########################################################################
 # Let's run a test
 
 assert np.array_equal(np_B, np_A + 10)

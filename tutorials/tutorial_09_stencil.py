@@ -10,7 +10,7 @@ import numpy as np
 
 import heterocl as hcl
 
-##############################################################################
+#%%###########################################################################
 # Stencil Comptuation
 # -------------------
 # Stencil kernels compute output based on a sliding window over the input. The
@@ -26,7 +26,7 @@ def jacobi(input_image, output_image):
 
     return hcl.update(output_image, jacobi_kernel, name=output_image.name)
 
-##############################################################################
+#%%###########################################################################
 # Use the Stencil Backend
 # -----------------------
 # HeteroCL provides a special backend for stencil computation kernels. It can
@@ -38,7 +38,7 @@ output_image = hcl.placeholder((480, 640), name="output", dtype=dtype)
 soda_schedule = hcl.create_schedule([input_image, output_image], jacobi)
 print(hcl.build(soda_schedule, target='soda'))
 
-##############################################################################
+#%%###########################################################################
 # Increase Parallelism
 # --------------------
 # The above program is written in the SODA DSL, which provides advanced
@@ -52,7 +52,7 @@ axis = tensor.axis
 soda_schedule[tensor].unroll(axis[len(axis) - 1], factor=8)
 print(hcl.build(soda_schedule, target='soda'))
 
-##############################################################################
+#%%###########################################################################
 # Generatel HLS C++ Code
 # ----------------------
 # The SODA DSL certainly does not compile directly. It needs to be passed to

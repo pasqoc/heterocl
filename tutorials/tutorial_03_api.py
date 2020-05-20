@@ -8,10 +8,10 @@ In this tutorial, we will show more HeteroCL compute APIs. These APIs are used
 to build the algorithm. Note that in HeteroCL, the compute APIs can be used
 along with the imperative DSL.
 """
-
+#%%
 import heterocl as hcl
 
-##############################################################################
+#%%###########################################################################
 # ``hcl.compute``
 # ---------------
 # We have introduced this API before. This API returns a **new tensor** whose
@@ -35,7 +35,7 @@ def compute_example(A, B):
 s = hcl.create_schedule([A, B], compute_example)
 print(hcl.lower(s))
 
-##############################################################################
+#%%###########################################################################
 # ``hcl.update``
 # --------------
 # This API is similar to `hcl.compute` in that it defines how you **update a
@@ -62,7 +62,7 @@ def update_example(A, B, C):
 s = hcl.create_schedule([A, B, C], update_example)
 print(hcl.lower(s))
 
-##############################################################################
+#%%###########################################################################
 # ``hcl.mutate``
 # -------------------
 # This API allows users to describe any loops with vector code, even if the
@@ -89,7 +89,7 @@ def mut_example(A, B, C):
 s = hcl.create_schedule([A, B, C], mut_example)
 print(hcl.lower(s))
 
-##############################################################################
+#%%###########################################################################
 # Note that in this example, we are not allowed to directly write the
 # assignment statement inside the lambda function. This is forbidden by Python
 # syntax rules.

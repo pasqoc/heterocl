@@ -8,7 +8,7 @@ In this tutorial, we demonstrate how memory customization works in HeteroCL.
 """
 import heterocl as hcl
 import numpy as np
-##############################################################################
+#%%###########################################################################
 # Memory Customization in HeteroCL
 # --------------------------------
 # There are two types of memory customization in HeteroCL. The first one is
@@ -30,7 +30,7 @@ s = hcl.create_schedule(A, kernel)
 s.partition(A)
 print(hcl.lower(s))
 
-##############################################################################
+#%%###########################################################################
 # In the IR, we should see a line that annotates tensor ``A`` to be
 # partitioned completely.
 #
@@ -54,7 +54,7 @@ s.reshape(kernel.B, (10, 2, 5))
 s.partition(kernel.B, dim=3)
 print(hcl.build(s, target="vhls"))
 
-##############################################################################
+#%%###########################################################################
 # Data Reuse in HeteroCL
 # ----------------------
 # The other type of memory customization primitives involves the introduction
@@ -82,7 +82,7 @@ def kernel(A, F):
 s = hcl.create_schedule([A, F], kernel)
 print(hcl.lower(s))
 
-##############################################################################
+#%%###########################################################################
 # In the above example, we convolve the input tensor ``A`` with a filter ``F``.
 # Then, we store the output in tensor ``B``. Note that the output shape is
 # different from the shape of the input tensor. Let's give some real inputs.
@@ -99,7 +99,7 @@ print(hcl_F)
 print('Output:')
 print(hcl_B)
 
-##############################################################################
+#%%###########################################################################
 # To analyze the data reuse, let's take a closer look to the generated IR.
 # To begin with, we can see that in two consecutive iterations of ``x`` (i.e.,
 # the inner loop), there are 6 pixels that are overlapped, as illustrated in
@@ -135,7 +135,7 @@ s_x = hcl.create_schedule([A, F], kernel)
 WB = s_x.reuse_at(A, s_x[kernel.B], kernel.B.axis[1], "WB")
 print(hcl.lower(s_x))
 
-##############################################################################
+#%%###########################################################################
 # In the printed IR, you should be able to see a buffer ``WB`` with size
 # (3, 3) being allocated. Moreover, in the ``produce WB`` scope, you should
 # see the update algorithm described above. Now let's test the function again.
@@ -148,7 +148,7 @@ print(hcl_B)
 print('Output with WB:')
 print(hcl_Bx)
 
-##############################################################################
+#%%###########################################################################
 # You should see the same results with and without the window buffer.
 #
 # Reuse at a Different Dimension: Linebuffer
@@ -177,7 +177,7 @@ print(hcl_B)
 print('Output with LB:')
 print(hcl_By)
 
-##############################################################################
+#%%###########################################################################
 # Note that the difference between WB and LB is the we reuse at different
 # axes. We can also see from the printed IR that the allocated size is larger,
 # which is the same as illustrated in the figure above. In this case, we read
@@ -219,7 +219,7 @@ print(hcl_B)
 print('Output with reuse buffers:')
 print(hcl_Bxy)
 
-##############################################################################
+#%%###########################################################################
 # We can see from the IR that the allocation sizes are indeed as expected.
 #
 # Further Optimization
@@ -241,12 +241,12 @@ s_final.partition(F)
 s_final[kernel.B].pipeline(kernel.B.axis[1])
 print(hcl.lower(s_final))
 
-##############################################################################
+#%%###########################################################################
 # Finally, we can generate the HLS code and see if the II is indeed 1.
 
 f = hcl.build(s_final, target="vhls")
 
-##############################################################################
+#%%###########################################################################
 # Following is a sample report from Vivado_HLS.
 #
 # .. code::
