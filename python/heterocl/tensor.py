@@ -203,7 +203,7 @@ class TensorSlice(NodeGeneric, _expr.ExprOp):
 
     @property
     def dtype(self):
-        return self.tensor.dtype
+        return self._dtype # self.tensor.dtype
 
     def asnode(self):
         if len(self.indices) < len(self.tensor.shape):
