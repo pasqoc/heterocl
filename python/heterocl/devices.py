@@ -2,7 +2,7 @@
 #pylint: disable=too-few-public-methods, too-many-return-statements
 from .debug import DeviceError
 from .tools import option_table, model_table
-from future.utils import with_metaclass
+from six import with_metaclass
 
 class tooling(type):
     def __getattr__(cls, key):
