@@ -23,242 +23,8 @@ from . import codegen
 from . import ndarray
 from . import target as _target
 from . import make
+from .runtime import *
 from ..devices import platform
-
-def replace_text(f_name, prev, new):
-    with open(f_name, 'r') as fp:
-        data = fp.read()
-    data = data.replace(prev, new)
-    with open(f_name, 'w') as fp:
-        fp.write(data)
-
-def run_process(cmd, pattern=None, env=None):
-    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
-    out, err = p.communicate()
-    if err: print("error raised: ", err.decode())
-    if pattern: return re.findall(pattern, out.decode("utf-8"))
-    return out.decode("utf-8")
-
-@register_func
-def tvm_callback_exec_evaluate(platform, mode, host_only):
-    # perform simulation and extract qor
-    qor = dict()
-
-    if platform == "vivado":
-      out = run_process("cd project; make vivado 2>&1")
-      print(out)
-
-    elif platform == "vivado_hls": 
-
-      assert os.system("which vivado_hls >> /dev/null") == 0, \
-        "cannot find vivado hls on system path"
-      ver = run_process("g++ --version", "\d\.\d\.\d")[0].split(".")
-      assert int(ver[0]) * 10 + int(ver[1]) >= 48, \
-        "g++ version too old {}.{}.{}".format(ver[0], ver[1], ver[2])
-
-      # for host only mode
-      if not os.path.isfile("project/kernel.cpp"):
-        replace_text("project/Makefile", "kernel.cpp", "")
-        replace_text("project/host.cpp", "#include \"kernel.h\"", "")
-
-      cmd = "cd project; make "
-      if mode == "sw_sim": cmd += "csim"
-      else: assert False
-
-      out = run_process(cmd + " 2>&1")
-      runtime = [k for k in out.split("\n") if "seconds" in k][0]
-      print("[{}] Simulation runtime {}".format(
-          time.strftime("%H:%M:%S", time.gmtime()), runtime))
-
-    elif platform == "sdsoc":
-      assert os.system("which sds++ >> /dev/null") == 0, \
-        "cannot find sds++ on system path"
-      out = run_process("cd project; make sdsoc")
-      print(out)
-
-    elif platform == "sdaccel":
-      assert os.system("which xocc >> /dev/null") == 0, \
-        "cannot find xocc on system path"
-
-      if mode == "sw_sim":
-        cmd = "cd project; " +\
-              "export XCL_EMULATION_MODE=sw_emu; " +\
-              "./top_function_0_host.exe -f top_function_0.sw_emu.xclbin"
-        out = run_process(cmd)
-
-      elif mode == "hw_sim":
-        cmd = "cd project; " +\
-              "export XCL_EMULATION_MODE=hw_emu; " +\
-              "./top_function_0_host.exe -f top_function_0.hw_emu.xclbin"
-        out = run_process(cmd)
-        os.system("cat project/profile_summary.csv")
-
-      elif mode == "hw":
-        cmd = "cd project; " +\
-              "export XCL_EMULATION_MODE=hw; " +\
-              "./top_function_0_host.exe -f top_function_0.hw.xclbin"
-        out = run_process(cmd)
-
-    elif platform == "vitis":
-      assert os.system("which v++ >> /dev/null") == 0, \
-        "cannot find v++ on system path"
-      device = os.environ["XDEVICE"].split("/")[-1]
-      device = device.replace(".xpfm", "")
-      cmd = "cd project; " + \
-            "XCL_EMULATION_MODE=sw_emu ./host build_dir" + \
-            ".sw_emu." + device + "/kernel.xclbin"
-      if host_only: cmd = "cd project; ./host"
-      out = run_process(cmd)
-
-    elif platform == "aocl":
-      cmd = "cd project; " + \
-            "env CL_CONTEXT_EMULATOR_DEVICE_INTELFPGA=1 ./host " + \
-            " kernel.aocx"
-      out = run_process(cmd)
-
-    else: # unsupported 
-      assert False, "unsupported " + platform
-
-    return str(qor) 
-
-@register_func
-def copy_and_compile(platform, mode, backend, host_only, cfg):
-    """  create necessary files and compile into binary """
-    path = api.__file__
-    path = os.path.join(path[0:path.find("python")], "tvm/src/template/")
-
-    if platform == "rocket":
-        ppac = api.__file__ + "/hlib/rocc-ppac" 
-        emulator = os.path.join(ppac, "rocket/emulator/emulator-freechips." + \
-                                      "rocketchip.system-RoccExampleConfig-debug")
-        # build emulator if not exist
-        if not os.path.isfile(emulator):
-            cmd = "cd " + ppac + ";"
-            cmd += "cp src/Ppac.v rocket/src/main/resources/vsrc;" + \
-                   "cp src/PpacRoCC.scala rocket/src/main/scala/tile;" + \
-                   "cd rocket && git apply ../src/rocc-ppac.patch;" + \
-                   "cd emulator && make CONFIG=RoccExampleConfig debug"
-            # create subprocess to check
-            subprocess.Popen(cmd, shell=True, stdout=open("build.log", "w")).wait()
-
-        # re-build proxy kernel
-        if not os.path.isfile(ppac + "/rocket/riscv-pk/build/pk"):
-            cmd = "cd " + ppac + "/rocket/riscv-pk;"
-            cmd += "git apply ../../tests/patches/riscv-pk.patch;"
-            cmd += "mkdir build; cd build;"
-            cmd += " ../configure --prefix=$RISCV/riscv64-unknown-elf --host=riscv64-unknown-elf;"
-            cmd += "make -j8; make install"
-            subprocess.Popen(cmd, shell=True, stdout=open("build.log", "w")).wait()
-        return "success"
-
-    # copy tcl and testbench  
-    elif platform == "vivado_hls" or platform == "vivado":
-        os.system("cp " + path + "vivado/* project/")
-        os.system("cp " + path + "harness.mk project/")
-        return "success"
-
-    # copy sdsoc makefile
-    elif platform == "sdsoc":
-        os.system("cp " + path + "sdsoc/* project/")
-        os.system("cp " + path + "harness.mk project/")
-        return "success"
-
-    elif platform == "sdaccel":
-        os.system("cp " + path + "sdaccel/* project/")
-        os.system("cp " + path + "harness.mk project/")
-        replace_text("project/Makefile", "App", "top_function_0")
-        replace_text("project/utils.h", 
-                     "xilinx_aws-vu9p-f1-04261818_dynamic_5_0", 
-                     "xilinx_vcu1525_dynamic_5_1")
-        if backend == "vhls":
-          replace_text("project/Makefile", "kernel.cl", "kernel.cpp")
-
-        # compile the program 
-        assert os.system("which xocc >> /dev/null") == 0, \
-            "cannot find xocc on system path"
-
-        if mode == "sw_sim":
-            env = os.environ.copy()
-            assert "AWS_PLATFORM" in os.environ, \
-                   "aws platform info missing" 
-
-            # re-compile host only (reuse context ?) 
-            if False and os.path.isfile("top_function_0.sw_emu.xclbin"):
-              run_process("cd project; make clean; make host")
-              run_process("cp top_function_0.sw_emu.xclbin project/")
-
-            else: # config & compile
-              env["XCL_EMULATION_MODE"] = "sw_emu"
-              cmd = "cd project; make clean;"
-              cmd += "emconfigutil --platform=$AWS_PLATFORM;"
-              cmd += "make ocl OCL_TARGET=sw_emu \
-                      OCL_PLATFORM=$AWS_PLATFORM \
-                      APPLICATION_DIR=" + os.getcwd() + "/project/"
-              out = run_process(cmd, env=env)
-
-        # enable profiler 
-        elif mode == "hw_sim":
-            env = os.environ.copy()
-            assert "AWS_PLATFORM" in os.environ, \
-                   "aws platform info missing" 
-
-            env["XCL_EMULATION_MODE"] = "hw_emu"
-            cmd = "cd project; make clean;"
-            cmd += "emconfigutil --platform=$AWS_PLATFORM;"
-            cmd += "make ocl OCL_TARGET=hw_emu \
-                    OCL_PLATFORM=$AWS_PLATFORM \
-                    APPLICATION_DIR=" + os.getcwd() + "/project/"
-            out = run_process(cmd, env=env)
-
-        elif mode == "hw":
-            env = os.environ.copy()
-            assert "AWS_PLATFORM" in os.environ, \
-                   "aws platform info missing" 
-
-            env["XCL_EMULATION_MODE"] = "hw"
-            cmd = "cd project; make clean;"
-            cmd += "emconfigutil --platform=$AWS_PLATFORM;"
-            cmd += "make ocl OCL_TARGET=hw \
-                    OCL_PLATFORM=$AWS_PLATFORM \
-                    APPLICATION_DIR=" + os.getcwd() + "/project/"
-            out = run_process(cmd, env=env)
-          
-        return "success"
-
-    elif platform == "vitis":
-        env = os.environ.copy()
-        assert "XDEVICE" in os.environ, \
-               "vitis platform info missing" 
-        os.system("cp " + path + "vitis/* project/")
-        cmd = "cd project; make clean;"
-
-        if not host_only:
-            cmd += "make all TARGET=sw_emu DEVICE=$XDEVICE"
-        else: cmd += "make host"
-        out = run_process(cmd)
-        return "success"
-
-    elif platform == "aocl":
-        env = os.environ.copy()
-        assert "INTELFPGAOCLSDKROOT" in os.environ, \
-               "cannot find aocl sdk for fpga on path" 
-
-        os.system("cp " + path + "aocl/* project/")
-        cmd = "cd project; make clean; make;"
-        # compile kernel for xcel device
-        cmd += " aoc"
-        if mode == "sw_sim":
-            cmd += " -march=emulator"
-
-        cmd += " -I $INTELFPGAOCLSDKROOT/include/kernel_headers"
-        cmd += " -time time.out -time-passes"
-        cmd += " -v -fpc -fp-relaxed --opt-arg -nocaching"
-        cmd += " -profile -report kernel.cl"
-        out = run_process(cmd) 
-        return "success"
-
-    else: # unrecognized platform
-        assert False, "unsupported platform " + platform
 
 class DumpIR(object):
     """
@@ -606,7 +372,7 @@ def lower(sch,
     stmt = ir_pass.Simplify(stmt) #TODO: SOLVE SHIFTING
     stmt = ir_pass.LowerStorageAccessInfo(stmt)
     stmt = ir_pass.RemoveNoOp(stmt)
-    stmt = ir_pass.RewriteUnsafeSelect(stmt)
+    #stmt = ir_pass.RewriteUnsafeSelect(stmt) # We don't really need this
     stmt = ir_pass.InferStream(stmt, arg_list)
     for f in lower_phase3:
         stmt = f(stmt)
@@ -618,7 +384,7 @@ def lower(sch,
     else:
         return ir_pass.MakeAPI(stmt, name, arg_list, 0, cfg.restricted_func)
 
-def build_fpga_kernel(sch, args, target, name="default_function"):
+def build_fpga_kernel(sch, args, target, name="default_function", schedule_name=""):
     """Build an FPGA kernel.
 
     Parameters
@@ -677,7 +443,7 @@ def build_fpga_kernel(sch, args, target, name="default_function"):
             host = target.host.lang = "aocl"
             xcel = target.xcel.lang = "aocl"
 
-        elif target.tool.name in ("vivado_hls", "vivado", "sdsoc"):
+        elif target.tool.name in ("vivado_hls", "sdsoc"):
             host = target.host.lang.replace("hlsc", "vhls")
             xcel = target.xcel.lang.replace("hlsc", "vhls")
 
@@ -686,18 +452,31 @@ def build_fpga_kernel(sch, args, target, name="default_function"):
 
         # return simulation built function
         mode = str(target.tool.mode)
-        assert mode in ["debug", "sw_sim", "hw_sim", "hw_exe"], \
-               "not support mode " + mode
+        if "|" in mode:
+            modes = mode.split("|")
+            for m in modes:
+                assert m in ["csyn", "csim", "cosim", "impl", "custom"], \
+                    "not supported mode " + m
+        else:
+            assert mode in ["csyn", "csim", "cosim", "impl", "custom",
+                            "debug", "sw_sim", "hw_sim", "hw_exe"], \
+                    "not supported mode " + mode
 
         if mode == "debug": # return source code only
 
             assert host is not None
             assert xcel is not None
 
+            target_tool = -1
+            if target.tool.name == "sdaccel": target_tool = 0
+            elif target.tool.name == "sdsoc": target_tool = 1
+            elif target.tool.name == "vitis": target_tool = 2
+            elif target.tool.name == "vivado_hls": target_tool = 3
+
             builder = getattr(codegen, "build_{0}".format(host))
-            host_code = builder(fdevice, 1)
+            host_code = builder(fdevice, 1, target_tool)
             builder = getattr(codegen, "build_{0}".format(xcel))
-            xcel_code = builder(fdevice, 2)
+            xcel_code = builder(fdevice, 2, target_tool)
             return "------ Host Code ------\n\n" + host_code + \
                    "------ Xcel Code ------\n\n" + xcel_code
 
@@ -713,7 +492,24 @@ def build_fpga_kernel(sch, args, target, name="default_function"):
             vals.insert(1, mode)
             keys.insert(2, "backend")
             vals.insert(2, xcel)
-            return builder(fdevice, keys, vals)
+            keys.insert(3, "script")
+            if "script" in target.tool.__dict__.keys():
+                vals.insert(3, target.tool.script)
+            else:
+                vals.insert(3, "")
+            keys.insert(4, "project")
+            if schedule_name != "":
+                folder = "{}-{}".format(schedule_name,target.project)
+            else:
+                folder = target.project
+            Project.path = folder
+            vals.insert(4, folder)
+            # make the project folder first
+            os.makedirs(folder, exist_ok=True)
+            f = builder(fdevice, keys, vals)
+            f.attach_target(target)
+            f.set_name(folder)
+            return f
 
     except AttributeError:
         raise AttributeError("Cannot find the target builder %s" % target)
@@ -725,7 +521,8 @@ def build(sch,
           target_host=None,
           name="default_function",
           binds=None,
-          stmt=None):
+          stmt=None,
+          schedule_name=""):
     """Build a function with arguments as signiture.
 
     Parameters
@@ -765,12 +562,12 @@ def build(sch,
     See the note on :any:`tvm.target` on target string format.
     """
     if isinstance(target, platform):
-        return build_fpga_kernel(sch, args, target, name=name)
+        return build_fpga_kernel(sch, args, target, name=name, schedule_name=schedule_name)
     else: # default string type target
         target = _target.current_target() if target is None else target
         target = _target.create(target) if target else _target.create("llvm")
         if "fpga" in target.keys:
-            return build_fpga_kernel(sch, args, target.target_name, name=name)
+            return build_fpga_kernel(sch, args, target.target_name, name=name, schedule_name=schedule_name)
     BuildConfig.current = build_config()
 
     if isinstance(sch, schedule._Schedule):

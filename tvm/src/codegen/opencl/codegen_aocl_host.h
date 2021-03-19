@@ -3,8 +3,8 @@
  * \file codegen_aocl_host.h
  * \brief Generate cpp kernel code for AOCL.
  */
-#ifndef TVM_CODEGEN_CODEGEN_AOCL_HOST_H_
-#define TVM_CODEGEN_CODEGEN_AOCL_HOST_H_
+#ifndef CODEGEN_OPENCL_CODEGEN_AOCL_HOST_H_
+#define CODEGEN_OPENCL_CODEGEN_AOCL_HOST_H_
 
 #include <tvm/codegen.h>
 #include <tvm/packed_func_ext.h>
@@ -28,9 +28,10 @@ class CodeGenAOCLHost : public CodeGenC {
   void VisitStmt_(const Allocate* op) override;
   void VisitStmt_(const KernelStmt* op) override;
   void VisitStmt_(const Store* op) override;
+  void VisitStmt_(const ExternModule* op) override;
 
   void GenForStmt(const For* op, std::string pragma, bool before);
-  
+
  protected:
   std::string GetBufferRef(Type t, const Variable* buffer, Expr index);
 };
@@ -38,4 +39,4 @@ class CodeGenAOCLHost : public CodeGenC {
 }  // namespace codegen
 }  // namespace TVM
 
-#endif  // TVM_CODEGEN_CODEGEN_HLSC_H_
+#endif  // CODEGEN_OPENCL_CODEGEN_AOCL_HOST_H_

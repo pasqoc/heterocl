@@ -3,6 +3,7 @@
 import networkx as nx
 import matplotlib.pyplot as plt
 from ordered_set import OrderedSet
+from copy import deepcopy
 from .tvm import tensor
 from .tvm import make as _make
 from .tvm import stmt as _stmt
@@ -12,7 +13,8 @@ from .tvm import _api_internal
 from .tvm._api_internal import _ExternOp
 from .debug import DSLError, APIError
 from . import util
-from .devices import Device, DevMediaPair 
+from .devices import Device, DevMediaPair
+from itertools import count
 
 class Schedule(object):
     """Create a compute schedule.
@@ -30,11 +32,17 @@ class Schedule(object):
 
     stage_ops = []
     last_stages = OrderedSet([])
+    _ids = count(0)
 
-    def __init__(self, sch, inputs):
+    def __init__(self, sch, inputs, name=""):
+        self.id = next(self._ids)
         self.sch = sch
         self.inputs = inputs
         self.placement = dict()
+        if self.id > 0 and name == "":
+            self.name = "s{}".format(self.id)
+        else:
+            self.name = name
 
     def __getitem__(self, stage):
         try:
@@ -75,11 +83,51 @@ class Schedule(object):
                     level_count.append(0)
                 names += gen_graph(input_stage, y+1)
             name_with_prefix = stage.name_with_prefix
+            # op_map from string to tensor op
             op_map[name_with_prefix] = self.sch[stage._op]
+
             if len(name_with_prefix.split('.')) <= level or level == 0:
                 for name in names:
-                    graph.add_edge(name, name_with_prefix)
-                    pos[name] = (level_count[y], y)
+                    # insert intermediate stage
+                    if name in self.placement.keys():
+                        channel, new_stage, dev = self.placement[name]
+                        op_map[channel.op.name] = channel
+                        graph.add_edge(name, channel.op.name)
+                        pos[name] = (level_count[y], y)
+
+                        op_map[new_stage.op.name] = new_stage
+                        graph.add_edge(channel.op.name, new_stage.op.name)
+                        pos[channel.op.name] = (level_count[y], y)
+
+                        graph.add_edge(new_stage.op.name, name_with_prefix)
+                        pos[new_stage.op.name] = (level_count[y], y)
+                        if plot:
+                            print(name_with_prefix, "<==", new_stage.op.name, "<==", \
+                                channel.op.name, "<==", name)
+
+                    elif name.replace("_top.", "") in self.placement.keys():
+                        channel, new_stage, dev = self.placement[name.replace("_top.", "")]
+                        op_map[channel.op.name] = channel
+                        graph.add_edge(name, channel.op.name)
+                        pos[name] = (level_count[y], y)
+
+                        op_map[new_stage.op.name] = new_stage
+                        graph.add_edge(channel.op.name, new_stage.op.name)
+                        pos[channel.op.name] = (level_count[y], y)
+
+                        graph.add_edge(new_stage.op.name, name_with_prefix)
+                        pos[new_stage.op.name] = (level_count[y], y)
+                        if plot:
+                            print(name_with_prefix, "<==", new_stage.op.name, "<==", \
+                                channel.op.name, "<==", name)
+
+                    # add children nodes to graph
+                    else:
+                        if plot:
+                            print(name_with_prefix,  " <=== ", name)
+                        graph.add_edge(name, name_with_prefix)
+                        pos[name] = (level_count[y], y)
+
                     level_count[y] += 1
                 return [name_with_prefix]
             return names
@@ -96,25 +144,35 @@ class Schedule(object):
             pos[stage.name_with_prefix] = (x, 0)
             x += 1
 
+        if plot: # draw the network
+            try:
+                from networkx.drawing.nx_agraph import graphviz_layout
+            except ImportError:
+                raise ImportError("Graphviz and either PyGraphviz or Pydot required")
+            pos=graphviz_layout(graph)
+            nx.draw(graph, pos, with_labels=True)
+            plt.show()
+
         return graph, op_map
 
 
     def subgraph(self, inputs, outputs):
         assert len(inputs) > 0, "empty inputs"
         assert len(outputs) > 0, "empty outputs"
+
+        # check availability
         graph, op_map = self.dataflow_graph()
+        inputs  = [ _.name for _ in inputs ]
+        outputs = [ _.name for _ in outputs ]
 
-        # check availability 
-        inputs  = [ _.name.replace(".new", "") for _ in inputs ]
-        outputs = [ _.name.replace(".new", "") for _ in outputs ]
-
-        # from root to parents 
-        stack = outputs
-        subgraph = set()
+        # from root to parents
+        stack = deepcopy(outputs)
+        subgraph = list()
         while len(stack) > 0:
             op = stack.pop()
             if op in subgraph: continue
-            subgraph.add(op)
+            if op not in outputs:
+                subgraph.insert(0, op)
             if op not in graph.nodes:
                 op = "_top." + op
             assert op in graph.nodes, \
@@ -123,8 +181,24 @@ class Schedule(object):
                 if not op in inputs:
                     stack.append(_)
 
-        return op_map
+        subgraph = OrderedSet(subgraph)
+        return subgraph, op_map
 
+    def duplicate(self, inputs, outputs, factor=2):
+        """Extract kernel and duplicate the compute unit"""
+        subgraph, op_map = self.subgraph(inputs, outputs)
+        # combine the stages in subgraph
+        for index in range(len(subgraph)):
+            if index == len(subgraph) - 1: break;
+            pre_stage  = op_map[subgraph[index]]
+            post_stage = op_map[subgraph[index+1]]
+            axis_num = len(post_stage.op.axis)
+            axis = post_stage.op.axis[axis_num-1]
+            pre_stage.compute_at(post_stage, axis)
+
+        # split kernel
+        post_stage.split(post_stage.op.axis[0], factor)
+        return post_stage
 
     def reuse_at(self, target, parent, axis, name=None):
         """Create a reuse buffer reusing the output of current stage
@@ -154,7 +228,7 @@ class Schedule(object):
         """
         try:
             target = target.tensor
-        except AttributeError:
+        except (AttributeError, ValueError):
             try:
                 target = target._op
             except AttributeError:
@@ -179,11 +253,11 @@ class Schedule(object):
                 target = dest._op
             elif isinstance(dest, tuple):
                 src, target = dest
-            else: # target tensor 
+            else: # target tensor
                 target = dest.tensor
         else: target = dest
 
-        for src in srcs: 
+        for src in srcs:
             if isinstance(src, tuple):
                 src, tensor = src
                 assert tensor == target, + \
@@ -201,9 +275,8 @@ class Schedule(object):
 
 
     def to(self, tensors, dst, src=None, axis=0,
-           stream_type=_expr.StreamExpr.FIFO, depth=1, name=None):
-        """Stream a list of Tensors to dst devices 
-        
+           mode=_expr.IO.DMA, depth=1, local_buffer=True, name=None):
+        """Stream a list of Tensors to dst devices
         Parameters
         ----------
         tensors : list of Tensor
@@ -218,25 +291,32 @@ class Schedule(object):
         axis : axis index
             Move axis-th loop body to xcel scope
 
+        mode : data movement type
+            The modes of data movement (FIFO, DMA, MMIO)
+            For inter-kernel data movemnet, only FIFO is supported
+
         depth : channel depth
             The streaming channel depth
 
+        local_buffer : boolean
+            create local buffer for data on-device
+
         """
-        if stream_type > 2:
+        if mode not in [ _expr.IO.DMA, _expr.IO.FIFO ]:
             raise APIError("Invalid channel type")
-        rets = []
+        rets = list()
         if not isinstance(tensors, list):
             tensors = [tensors]
         for tensor in tensors:
             try:
                 if isinstance(tensor, Stage):
                     target = tensor._op
-                # unpack tuple of src stage and tensor 
+                # unpack tuple of src stage and tensor
                 elif isinstance(tensor, tuple):
                     src, target = tensor
                     # from hcl stage to tvm stage
                     src = self.__getitem__(src)
-                else: # target tensor 
+                else: # target tensor
                     target = tensor.tensor
             except (AttributeError, ValueError):
                 target = tensor
@@ -245,13 +325,14 @@ class Schedule(object):
             try: dst = self[dst]
             except: pass
 
+            move_to_device = False
             if src is None:
                 # move to device
                 if isinstance(dst, Device) or \
                         isinstance(dst, DevMediaPair):
-                    if axis == 0: 
-                        self.placement[target] = dst
-                    else: 
+                    if axis == 0:
+                        move_to_device = True
+                    else: # inner-stage movement
                         assert isinstance(tensor, Stage)
                         target = self[tensor]
 
@@ -259,8 +340,14 @@ class Schedule(object):
                     src = self[tensor]
 
             # target can be stage or tensor
-            ret = self.sch.to(target, dst, src, axis,
-                              stream_type, depth)
+            ret = self.sch.to(target, dst, src, axis, mode, depth, local_buffer)
+            # record the placement information
+            if move_to_device:
+                channel, ret = ret
+                self.placement[target.name] = \
+                        (self.__getitem__(channel), \
+                         self.__getitem__(ret), dst)
+
             rets.append(ret)
 
         if len(rets) == 1: return rets[0]
@@ -418,6 +505,9 @@ class Stage(object):
         self.last_substages = set([])
         self.name_with_prefix = self.name if Stage.get_len() == 0 \
                                     else Stage.get_current().name_with_prefix + "." + self.name
+        # Attribute for constant tensor
+        self.init_values = None
+        self.is_const = False
         # Private attributes for building a stage
         self._op = None
         self._hcl_dtype = util.get_dtype(dtype, self.name_with_prefix)
@@ -439,8 +529,13 @@ class Stage(object):
         output_bufs = [self._buf]
         body = self.pop_stmt()
         Stage._current.pop()
-        op = _ExternOp(self.name, "", self.axis_list, input_ops,
-                       input_bufs, output_bufs, body)
+        if self.init_values is not None:
+            op = _ExternOp(self.name, "", self.axis_list, input_ops,
+                           input_bufs, output_bufs, body,
+                           self.init_values, self.is_const)
+        else:
+            op = _ExternOp(self.name, "", self.axis_list, input_ops,
+                           input_bufs, output_bufs, body)
         self._op = op.output(0)
         # update last_update stages
         # if this stage is a substage of other stages
@@ -489,7 +584,7 @@ class Stage(object):
                 for stage in self.input_stages:
                     if stage.name == name:
                         return (self, stage._op)
-                # check tensors in input_stage.lhs 
+                # check tensors in input_stage.lhs
                 for stage in self.input_stages:
                     lhs = stage.lhs_tensors
                     for tensor in lhs:

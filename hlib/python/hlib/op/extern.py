@@ -70,7 +70,8 @@ class ModuleMarker(Mutator):
                 _make.StringImm("test"), body, 
                 list(self.info.keys()), list(self.info.values()))
 
-        return _make.For(loop_var, _min, extent, node.for_type, node.device_api, body)
+        return _make.For(loop_var, _min, extent, node.for_type, node.device_api,
+                         body, node.annotate_keys, node.annotate_values)
 
 
 def register_extern_ip(**attrs):
@@ -100,6 +101,11 @@ def create_extern_module(stage, dicts, ip_type="hls", path=None):
     for name, dtype in dicts["args"]:
         annotate_dict["input::" + name] = dtype 
     del annotate_dict["args"]
+
+    # check dependencies 
+    if ("deps" in dicts.keys()):
+      assert os.path.exists(dicts["deps"]), \
+              "deps path {} not exists".format(dicts["deps"])
 
     op = stage._op.op
     assert ip_type in ["rtl", "hls", "host"]
